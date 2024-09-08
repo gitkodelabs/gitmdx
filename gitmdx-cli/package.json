@@ -1,0 +1,13 @@
+{
+  "name": "gitmdx-cli",
+  "version": "1.0.0",
+  "main": "index.js",
+  "bin": {
+    "gitmdx": "./index.js"
+  },
+  "type": "module",
+  "scripts": {
+    "test": "echo Hello, World!"
+  },
+  "license": "ISC"
+}

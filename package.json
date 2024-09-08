@@ -4,7 +4,8 @@
   "module": "./dist//index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "gitmdx": "npm run serve --prefix packages/editor"
   },
   "author": "",
   "license": "ISC",
@@ -23,6 +24,7 @@
   },
   "dependencies": {
     "@mdx-js/react": "^3.0.1",
+    "commander": "^12.1.0",
     "lodash": "^4.17.21",
     "next-mdx-remote": "^5.0.0"
   }

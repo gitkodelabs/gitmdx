@@ -1,4 +1,10 @@
-import { getAllEntries, getEntry, updateEntry } from "./lib/provider/github";
+import {
+  getAllEntries,
+  getEntry,
+  updateEntry,
+  collateCategories,
+  getEntriesByCategory
+} from "./lib/provider/github";
 import chalker, { logIndicator, logLabel } from "./utils/chalker";
 
 interface initConfig {
@@ -9,6 +15,31 @@ interface initConfig {
   cache: boolean;
   refreshCacheInterval: number;
 }
+
+interface Cache {
+  data: any[] | null;
+  lastFetched: number | null;
+  expirationTime: number;
+}
+
+export const Cache: Cache = {
+  data: null,
+  lastFetched: null,
+  expirationTime: 60000
+};
+
+export function isCacheValid(cache : any): boolean {
+  return (
+    cache.data !== null &&
+    cache.lastFetched !== null &&
+    Date.now() - cache.lastFetched < cache.expirationTime
+  );
+}
+
+export const setCache = (data: any) => {
+  Cache.data = data;
+  Cache.lastFetched = Date.now();
+};
 
 export let GITHUB_FG_PAT: string | null = null;
 export let GITHUB_REPO: string | null = null;
@@ -42,8 +73,8 @@ const setConfig = (options: Partial<initConfig>): initConfig => {
 };
 
 export let entries: any = null;
-export let initialised: boolean = false;
 
+export let initialised: boolean = false;
 
 const defaultConfig: initConfig = {
   credentials: {
@@ -61,7 +92,6 @@ export const setEntries = (data: any) => {
 export const setInit = (bool: boolean) => {
   initialised = bool;
 };
-
 
 const init = async (options: Partial<initConfig> = {}) => {
   if (!initialised) {
@@ -94,10 +124,21 @@ const init = async (options: Partial<initConfig> = {}) => {
     console.log(
       logLabel,
       logIndicator,
-      chalker.fgYellow(`✨ gitmdx initialised...`)
+      chalker.fgGreen(`✨ gitmdx initialised...`)
     );
   }
 
+return initialised
 };
 
-export default { entries, getAllEntries, getEntry, updateEntry, init };
+export default {
+  initialised,
+  entries,
+  getAllEntries,
+  getEntry,
+  updateEntry,
+  init,
+  collateCategories,
+  categories: collateCategories,
+  getEntriesByCategory
+};

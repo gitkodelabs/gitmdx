@@ -1,6 +1,12 @@
-import { GITHUB_FG_PAT, GITHUB_REPO, entries, setEntries } from "../../";
+import {
+  Cache,
+  GITHUB_FG_PAT,
+  GITHUB_REPO,
+  entries,
+  isCacheValid,
+  setCache,
+} from "../../";
 import { serialize } from "next-mdx-remote/serialize";
-
 
 export const getDirFiles = async (path) => {
   try {
@@ -43,64 +49,130 @@ export const getFileFrontMatter = async (path) => {
     const data = await response.json();
 
     const content = atob(data.content);
-    const parsedMatter =  await serialize(content, { parseFrontmatter: true });
+    const parsedMatter = await serialize(content, { parseFrontmatter: true });
     return parsedMatter;
-
   } catch (error) {
-    console.error("Error fetching CMS data:", error);
+    console.error(`Error fetching CMS data at ${path}:`, error);
     throw new Error("Failed to fetch CMS data.");
   }
 };
 
-export const getAllEntries = async (extension = "", refreshCache = false) => {
+// export const getAllEntries = async (extension = "", refreshCache = false) => {
+//   try {
+//     if (!entries || refreshCache) {
+//       const data = await getDirFiles("_entries");
+//       setEntries(data);
+//     }
+
+//     let filteredEntries = entries;
+
+//     if (extension) {
+//       filteredEntries = entries.filter((file) => file.name.endsWith(`.${extension}.mdx`));
+//     }
+
+//     const entriesWithFrontMatter = await Promise.all(
+//       filteredEntries.map(async (file) => {
+//         const data = await getFileFrontMatter(`_entries/${file.name}`);
+//         return { slug: file.name.split(".")[0], ...file, ...data };
+//       })
+//     );
+
+//     return entriesWithFrontMatter;
+//   } catch (error) {
+//     console.error("Error fetching all entries:", JSON.stringify(error));
+//     throw new Error("Failed to fetch all entries.");
+//   }
+// };
+
+export async function getAllEntries(extension = "", refreshCache = false) {
   try {
-    if (!entries || refreshCache) {
-      const data = await getDirFiles("_entries");
-      setEntries(data);
+    if (isCacheValid(Cache) && !refreshCache) {
+      console.log("Returning cached _entries");
+      let filteredEntries = Cache.data;
+
+      if (extension) {
+        filteredEntries = entries.filter((file) =>
+          file.name.endsWith(`.${extension}.mdx`)
+        );
+      }
+
+      return filteredEntries;
     }
 
-    let filteredEntries = entries;
+    const data = await getDirFiles("_entries");
+
+    let filteredEntries = data;
 
     if (extension) {
-      filteredEntries = entries.filter((file) => file.name.endsWith(`.${extension}.mdx`));
+      filteredEntries = filteredEntries.filter((file) =>
+        file.name.endsWith(`.${extension}.mdx`)
+      );
     }
 
     const entriesWithFrontMatter = await Promise.all(
       filteredEntries.map(async (file) => {
         const data = await getFileFrontMatter(`_entries/${file.name}`);
-        return { ...file, ...data };
+        return { slug: file.name.split(".")[0], href_type: file.name.split(".")[1], ...file, data: data };
       })
     );
 
+    setCache(entriesWithFrontMatter);
     return entriesWithFrontMatter;
   } catch (error) {
-    console.error("Error fetching all entries:", error);
-    throw new Error("Failed to fetch all entries.");
+    console.error(JSON.stringify(error));
+    throw new Error("Failed to fetch _entries");
   }
-};
+}
+
+export async function collateCategories(extension = "") {
+  const categorySet = new Set();
+  const entries = await getAllEntries(extension);
+
+  entries?.forEach((item) => {
+    if (item.frontmatter && Array.isArray(item.frontmatter.categories)) {
+      item.frontmatter.categories.forEach((category) => {
+        const categoryKey = JSON.stringify(category);
+        categorySet.add(categoryKey);
+      });
+    }
+  });
+
+  return Array.from(categorySet).map((categoryKey) =>
+    JSON.parse(categoryKey as string)
+  );
+}
+
+export async function getEntriesByCategory(category, extension = "") {
+  const categoryEntries = {};
+  const entries = await getAllEntries(extension);
+
+  entries?.forEach((item) => {
+    if (item.frontmatter && Array.isArray(item.frontmatter.categories)) {
+      item.frontmatter.categories.forEach((category) => {
+        const categoryKey = JSON.stringify(category);
+
+        if (!categoryEntries[categoryKey]) {
+          categoryEntries[categoryKey] = [];
+        }
+
+        categoryEntries[categoryKey].push(item);
+      });
+    }
+  });
+
+  const targetCategoryKey = JSON.stringify(category);
+  return categoryEntries[targetCategoryKey] || [];
+}
 
 export const getEntry = async (fileName) => {
   try {
-    const entry = await entries.find(ent=> ent.name === `${fileName}.mdx`)
+    const entry = await entries.find((ent) => ent.name === `${fileName}.mdx`);
     return entry;
   } catch (error) {
     console.error(`Error fetching entry ${fileName}:`, error);
     throw new Error(`Failed to fetch entry ${fileName}.`);
   }
 };
-
-
-// export const getEntry = async (fileName) => {
-//   try {
-//     const data = await getFileFrontMatter(
-//       `_entries/${fileName}`,
-//     );
-//     return data;
-//   } catch (error) {
-//     console.error(`Error fetching entry ${fileName}:`, error);
-//     throw new Error(`Failed to fetch entry ${fileName}.`);
-//   }
-// };
 
 export const updateEntry = async (fileName, newContent) => {
   try {
